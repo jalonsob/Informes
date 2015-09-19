@@ -1,0 +1,450 @@
+#! /usr/bin/python
+# -*- coding: utf-8 -*-
+
+## Copyright (C) 2014 Bitergia
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 3 of the License, or
+## (at your option) any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this program; if not, write to the Free Software
+## Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+##
+## Package to deal with queries for ITS data from *Grimoire
+##  (Bicho databases)
+##
+## Authors:
+##   Jesus M. Gonzalez-Barahona <jgb@bitergia.com>
+##
+
+from grimoirelib_alch.type.timeseries import TimeSeries
+from grimoirelib_alch.type.activity import ActivityList
+from grimoirelib_alch.query.common import GrimoireDatabase, GrimoireQuery
+
+from sqlalchemy import func, Column, Integer, ForeignKey
+from sqlalchemy.sql import label
+from datetime import datetime
+
+
+class DB (GrimoireDatabase):
+    """Class for dealing with ITS (Bicho) databases.
+
+    """
+ 
+    def _query_cls(self):
+        """Return que defauld Query class for this database
+
+        Returns
+        -------
+
+        GrimoireQuery: default Query class.
+
+        """
+
+        return Query
+
+    def _create_tables(self, tables = None, tables_id = None):
+        """Create all SQLAlchemy tables.
+
+        Builds a SQLAlchemy class per SQL table, by using _table().
+        It assumes self.Base, self.schema and self.schema_id are already
+        set (see super.__init__() code).
+
+        """
+
+        DB.Changes = GrimoireDatabase._table (
+            bases = (self.Base,), name = 'Changes',
+            tablename = 'changes',
+            schemaname = self.schema,
+            columns = dict (
+                issue_id = Column(Integer,
+                                  ForeignKey(self.schema + '.' + 'issues.id'))
+                ))
+
+        DB.Issues = GrimoireDatabase._table (
+            bases = (self.Base,), name = 'Issues',
+            tablename = 'issues',
+            schemaname = self.schema,
+            columns = dict (
+                changed_by = Column(
+                    Integer,
+                    ForeignKey(self.schema + '.' + 'people.id'))     
+                ))
+
+        DB.People = GrimoireDatabase._table (
+            bases = (self.Base,), name = 'People',
+            tablename = 'people',
+            schemaname = self.schema)
+
+        DB.PeopleUIdentities = GrimoireDatabase._table (
+            bases = (self.Base,), name = 'PeopleUIdentities',
+            tablename = 'people_uidentities',
+            schemaname = self.schema,
+            columns = dict (
+                uuid = Column(
+                    Integer,
+                    ForeignKey(self.schema_id + '.' + 'uidentities.uuid')
+                ),
+                people_id = Column(
+                    Integer,
+                    ForeignKey(self.schema + '.' + 'people.id'),
+                    primary_key = True
+               ),
+            )
+        )
+
+        DB.Trackers = GrimoireDatabase._table (
+            bases = (self.Base,), name = 'Trackers',
+            tablename = 'trackers',
+            schemaname = self.schema)
+
+        DB.UIdentities = GrimoireDatabase._table (
+            bases = (self.Base,), name = 'UIdentities',
+            tablename = 'uidentities',
+            schemaname = self.schema_id)
+
+        if "organizations" in tables_id:
+            DB.Organizations = GrimoireDatabase._table (
+                bases = (self.Base,), name = 'Organizations',
+                tablename = 'organizations',
+                schemaname = self.schema_id,
+                columns = dict (
+                    id = Column(Integer, primary_key = True)
+                    )
+                )
+
+        if "enrollments" in tables_id:
+            DB.Enrollments = GrimoireDatabase._table (
+                bases = (self.Base,), name = 'Enrollments',
+                tablename = 'enrollments',
+                schemaname = self.schema_id,
+                )
+
+
+class Query (GrimoireQuery):
+    """Class for dealing with ITS queries"""
+
+
+    def select_personsdata(self, kind):
+        """Adds columns with persons data to select clause.
+
+        Adds people.user, people.email to the select clause of query.
+        Does not join new tables.
+
+        Parameters
+        ----------
+
+        kind: {"openers", "closers", "changers"}
+           Kind of person to select
+
+        Returns
+        -------
+
+        ITSQuery: Result query, with new fields: id, name, email        
+
+        """
+
+        query = self.add_columns (label("person_id", DB.People.id),
+                                  label("name", DB.People.user_id),
+                                  label('email', DB.People.email))
+        if kind == "openers":
+            person = DB.Issues.submitted_by
+            table = DB.Issues
+        elif kind == "changers":
+            person = DB.Changes.changed_by
+            table = DB.Changes
+        elif kind == "closers":
+            raise Exception ("select_personsdata: Not yet implemented")
+        else:
+            raise Exception ("select_personsdata: Unknown kind %s." \
+                             % kind)
+
+        if table in self.joined:
+            query = query.filter (DB.People.id == person)
+        else:
+            self.joined.append (table)
+            query = query.join (table, DB.People.id == person)
+        return query
+
+
+    def select_personsdata_uid(self, kind):
+        """Adds columns with persons data to select clause (uid version).
+
+        Adds person_id, name, to the select clause of query,
+        having unique identities into account.
+        Joins with PeopleUIdentities, UIdentities, and Changes / Isues if they
+        are not already joined.
+        Relationships: UIdentities.uuid == PeopleUIdentities.uuid,
+        PeopleUIdentities.people_id == person
+
+        Parameters
+        ----------
+
+        kind: {"openers", "closers", "changers"}
+           Kind of person to select
+
+        Returns
+        -------
+
+        SCMObject: Result query, with new fields: id, name, email        
+
+        """
+
+        query = self.add_columns (label("person_id", DB.UIdentities.uuid),
+                                  label("name", DB.UIdentities.identifier))
+        if kind == "openers":
+            person = DB.Issues.submitted_by
+            table = DB.Issues
+        elif kind == "changers":
+            person = DB.Changes.changed_by
+            table = DB.Changes
+        elif kind == "closers":
+            raise Exception ("select_personsdata: Not yet implemented")
+        else:
+            raise Exception ("select_personsdata: Unknown kind %s." \
+                             % kind)
+        if not self.joined:
+            # First table, UIdentities is in FROM
+            self.joined.append (DB.UIdentities)
+        if not self.joined or DB.UIdentities in self.joined:
+            # First table, UIdentities is in FROM, or we have UIdentities
+            if DB.PeopleUIdentities not in self.joined:
+                self.joined.append (DB.PeopleUIdentities)
+                query = query.join (
+                    DB.PeopleUIdentities,
+                    DB.UIdentities.uuid == DB.PeopleUIdentities.uuid
+                    )
+            if table in self.joined:
+                query = query.filter (DB.PeopleUIdentities.people_id == person)
+            else:
+                self.joined.append (table)
+                query = query.join (table,
+                                    DB.PeopleUIdentities.people_id == person)
+        elif DB.PeopleUIdentities in self.joined:
+            # We have PeopleUIdentities (table should be joined), no UIdentities
+            if table not in self.joined:
+                raise Exception ("select_personsdata_uid: " + \
+                                     "If PeopleUIdentities is joined, " + \
+                                     str(table) + " should be joined too")
+            self.joined.append (DB.UIdentities)
+            query = query.join (
+                DB.UIdentities,
+                DB.UIdentities.uuid == DB.PeopleUIdentities.uuid)
+        elif table in self.joined:
+            # We have table, and no PeopleUIdentities, no UIdentities
+            self.joined.append (DB.PeopleUIdentities)
+            query = query.join (DB.PeopleUIdentities,
+                                DB.PeopleUIdentities.people_id == person)
+            self.joined.append (DB.UIdentities)
+            query = query.join (DB.UIdentities,
+                                DB.UIdentities.uuid == PeopleUIdentities.uuid)
+        else:
+            # No table, no PeopleUIdentities, no UIdentities but some other table
+            raise Exception ("select_personsdata_uid: " + \
+                                 "Unknown table to join to")
+        return query
+
+
+    def select_changesperiod(self):
+        """Add to select the period of the changed tickets.
+
+        Adds min(changes.changed_on) and max(changes.changed_on)
+        for selected commits.
+        
+        Returns
+        -------
+
+        SCMObject: Result query, with two new fields: firstdate, lastdate
+
+        """
+
+        query = self.add_columns (label('firstdate',
+                                        func.min(DB.Changes.changed_on)),
+                                  label('lastdate',
+                                        func.max(DB.Changes.changed_on)))
+        return query
+
+
+    def select_orgs (self):
+        """Select organizations data.
+
+        Include id and name, as they appear in the organizations table.
+        Warning: doesn't join other tables. For now, only works alone.
+
+        Returns
+        -------
+
+        Query
+            Including new columns in SELECT
+        
+        """
+
+        query = self.add_columns (label("org_id", DB.Organizations.id),
+                                  label("org_name", DB.Organizations.name))
+        return query
+
+
+    def filter_period(self, start = None, end = None, date = "change"):
+        """Filter variable for a period
+
+        - start: datetime, starting date
+        - end: datetime, end date
+        - date: "change"
+
+        Commits considered are between starting date and end date
+        (exactly: start <= date < end)
+        """
+
+        query = self
+        if date == "change":
+            date_field = DB.Changes.changed_on
+        else:
+            raise Exception ("filter_period: Unknown kind of date: %s." \
+                                 % date)
+
+        if start is not None:
+            self.start = start
+            query = query.filter(date_field >= start.isoformat())
+        if end is not None:
+            self.end = end
+            query = query.filter(date_field < end.isoformat())
+        return query
+
+
+    def filter_orgs (self, orgs):
+        """Filter organizations matching a list of names
+
+        Fiters query by a list of organization names, checking for
+        them in the organizations table.
+
+        Parameters
+        ----------
+        
+        orgs: list of str
+            List of organizations
+
+        """
+
+        query = self
+        query = query.filter(DB.Organizations.name.in_(orgs))
+        return query
+
+
+    def filter_org_ids (self, list, kind):
+        """Filter organizations matching a list of organization ids
+
+        Fiters query by a list of organization ids.
+
+        Parameters
+        ----------
+        
+        list: list of int
+            List of organization ids
+        kind: {"openers", "closers", "changers"}
+           Kind of person to select
+
+        """
+
+        query = self
+        if kind == "changers":
+            person_id = DB.Changes.changed_by
+            date_id = DB.Changes.changed_on
+        elif kind in ("closers", "openers"):
+            raise Exception ("filter_org_ids: " \
+                                 "Kind not yet implemented %s." \
+                                 % kind)
+        else:
+            raise Exception ("filter_org_ids: Unknown kind %s." \
+                                 % kind)
+        query = query \
+            .join (DB.Enrollments,
+                   DB.PeopleUIdentities.uuid == \
+                       DB.Enrollments.uuid) \
+            .filter (date_id.between (
+                           DB.Enrollments.start,
+                           DB.Enrollments.end
+                           )) \
+            .filter (DB.Enrollments.organization_id.in_(list))
+        return query
+
+
+    def group_by_person (self):
+        """Group by person
+
+        Uses person_id field in the query to do the grouping.
+        That field should be added by some other method.
+
+        Parameters
+        ----------
+
+        None
+
+        Returns
+        -------
+
+        SCMQuery object, with a new field (person_id)
+        and a "group by" clause for grouping the results.
+
+        """
+
+        return self.group_by("person_id")
+
+
+    def activity (self):
+        """Return an ActivityList object.
+
+        The query has to produce rows with the following fields:
+        id (string),  name (string), start (datetime), end (datetime)
+
+        """
+
+        list = self.all()
+        return ActivityList(list)
+
+
+if __name__ == "__main__":
+
+    from grimoirelib_alch.aux.standalone import stdout_utf8, print_banner
+
+    stdout_utf8()
+
+    database = DB (url = 'mysql://jgb:XXX@localhost/',
+                   schema = 'vizgrimoire_bicho',
+                   schema_id = 'vizgrimoire_cvsanaly')
+    session = database.build_session(Query, echo = False)
+
+    #---------------------------------
+    print_banner ("List of openers")
+    res = session.query() \
+        .select_personsdata("openers") \
+        .group_by_person()
+    print res
+    for row in res.limit(10).all():
+        print row.person_id, row.name, row.email
+
+    #---------------------------------
+    print_banner ("Activity period for changers")
+    res = session.query() \
+        .select_personsdata("changers") \
+        .select_changesperiod() \
+        .group_by_person()
+    print res
+    for row in res.limit(10).all():
+        print row.person_id, row.name, row.email, row.firstdate, row.lastdate
+
+    #---------------------------------
+    print_banner ("Activity period for changers (uid)")
+    res = session.query() \
+        .select_personsdata_uid("changers") \
+        .select_changesperiod() \
+        .group_by_person()
+    print res
+    for row in res.limit(10).all():
+        print row.person_id, row.name, row.firstdate, row.lastdate
