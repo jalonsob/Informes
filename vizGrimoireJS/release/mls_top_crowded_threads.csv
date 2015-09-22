@@ -1,0 +1,11 @@
+date,initiator,subject,people
+2015-06-01,Ian Cordasco,[openstack-dev] [all] [stable] No longer doing stable point  releases,27
+2015-06-25,John Garbutt,[openstack-dev] [Nova] The unbearable lightness of specs,26
+2015-04-24,Jay Pipes,[openstack-dev] Please stop reviewing code while asking 	questions,25
+2015-06-15,Dolph Mathews,[openstack-dev] [api][nova][ironic] Microversion API HTTP header,24
+2015-05-12,Marco Fargetta,[openstack-dev] [nova][all] Architecture Diagrams in ascii art?,24
+2015-04-24,Dean Troyer,[openstack-dev] [all] Question for the TC candidates,23
+2015-04-30,Joe Gordon,[openstack-dev] [nova] Proposal to add Melanie Witt to nova-core,21
+2015-06-16,Jay Pipes,[openstack-dev] [packaging] Adding packaging as an OpenStack  project,21
+2015-05-07,David Medberry,[openstack-dev] [swift] Go! Swift!,20
+2015-04-29,Ed Leafe,[openstack-dev] [tc] Who is allowed to vote for TC candidates,20

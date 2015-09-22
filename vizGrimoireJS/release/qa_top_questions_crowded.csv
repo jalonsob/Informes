@@ -1,0 +1,11 @@
+qid,subject,site,people
+67284, new kilo install unable to launch,https://ask.openstack.org/en/question/67284/new-kilo-install-unable-to-launch-instance-no-useful-errors-found/,8
+67805, no valid host was found,https://ask.openstack.org/en/question/67805/no-valid-host-was-found/,7
+65678, cant create or delete instances,https://ask.openstack.org/en/question/65678/cant-create-or-delete-instances/,7
+66833, kilo on centos7 keystone throws http,https://ask.openstack.org/en/question/66833/kilo-on-centos7-keystone-throws-http-500-except-when-using-os\_token/,7
+65162, instance cannot connect to external network,https://ask.openstack.org/en/question/65162/instance-cannot-connect-to-external-network/,7
+64849, maximum amount of instances deployed at,https://ask.openstack.org/en/question/64849/maximum-amount-of-instances-deployed-at-same-time/,6
+67273, nova compute cant connect to nova,https://ask.openstack.org/en/question/67273/nova-compute-cant-connect-to-nova-controller/,6
+64853, error unable to connect to neutron,https://ask.openstack.org/en/question/64853/error-unable-to-connect-to-neutron/,6
+65582, error instance state after host reboot,https://ask.openstack.org/en/question/65582/error-instance-state-after-host-reboot/,6
+67958, error http500 when running nova image,https://ask.openstack.org/en/question/67958/error-http500-when-running-nova-image-list/,6

@@ -23,7 +23,7 @@
 ##   Luis Cañas-Díaz <lcanas@bitergia.com>
 ##
 ## python openstack_report.py -a openstack_2015q2_git -d openstack_2015q2_gerrit -i openstack_2015q2_git -r 2013-07-01,2013-10-01,2014-01-01,2014-04-01,2014-07-01,2014-10-01,2015-01-01,2015-04-01,2015-07-01 -c openstack_2015q2_tickets      -b openstack_2015q2_mailing_lists -f openstack_2015q2_qaforums -e openstack_2015q2_irc
-## python openstack_report_2.py -w 3307 -a amartin_cvsanaly_openstack_sh -i amartin_sortinghat_openstack_sh -c dic_bicho_openstack_6255_bis -b amartin_mlstats_openstack_sh -e amartin_irc_openstack_sh -j amartin_projects_openstack_sh -d amartin_bicho_gerrit_openstack_sh -r 2013-07-01,2013-10-01,2014-01-01,2014-04-01,2014-07-01,2014-10-01,2015-01-01,2015-04-01,2015-07-01
+## python openstack_report_2.py -w 3307 -a amartin_cvsanaly_openstack_sh -i amartin_sortinghat_openstack_sh -c dic_bicho_openstack_6255_bis -b amartin_mlstats_openstack_sh -e amartin_irc_openstack_sh -j amartin_projects_openstack_sh -d amartin_bicho_gerrit_openstack_sh -r 2013-07-01,2013-10-01,2014-01-01,2014-04-01,2014-07-01,2014-10-01,2015-01-01,2015-04-01,2015-07-01 -f amartin_sybil_openstack_sh
 
 
 import imp, inspect
@@ -408,7 +408,7 @@ def mls_report(dbcon, filters):
     dataset["senders_init"] = senders_init.get_agg()["senders_init"]
 
     from vizgrimoire.analysis.threads import Threads
-    SetDBChannel(dbcon.user, dbcon.password, dbcon.database)
+    SetDBChannel(dbcon.user, dbcon.password, dbcon.database,port=opts.port)
     threads = Threads(filters.startdate, filters.enddate, dbcon.identities_db)
     top_longest_threads = threads.topLongestThread(10)
     top_longest_threads = serialize_threads(top_longest_threads, False, threads)
@@ -1072,7 +1072,6 @@ if __name__ == '__main__':
     people_out = ["OpenStack Jenkins","Launchpad Translations on behalf of nova-core","Jenkins","OpenStack Hudson","gerrit2@review.openstack.org","linuxdatacenter@gmail.com","Openstack Project Creator","Openstack Gerrit","openstackgerrit"]
     affs_out = ["-Bot","-Individual","-Unknown"]
 
-    projects_list=["Common Libraries"]
     # Analysis per project
     for project in projects_list:
         break
